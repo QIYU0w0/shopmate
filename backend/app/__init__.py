@@ -1,0 +1,1 @@
+"""ShopMate backend package."""
