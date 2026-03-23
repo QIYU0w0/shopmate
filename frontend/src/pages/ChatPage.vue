@@ -16,8 +16,10 @@ const quickPrompts = [
 ]
 
 const messages = computed(() => chatStore.currentMessages)
-const sessions = computed(() => chatStore.sessions)
 const products = computed(() => chatStore.currentProducts)
+const showEmptyState = computed(
+  () => messages.value.length === 0 && !chatStore.streamingReply && products.value.length === 0
+)
 
 async function bootstrapPage() {
   try {
@@ -40,50 +42,17 @@ async function handleSend(message?: string) {
     localError.value = error instanceof Error ? error.message : '发送失败。'
   }
 }
-
-async function handleCreateSession() {
-  localError.value = ''
-  try {
-    await chatStore.createSession()
-  } catch (error) {
-    localError.value = error instanceof Error ? error.message : '创建会话失败。'
-  }
-}
 </script>
 
 <template>
-  <section class="workspace-grid">
-    <aside class="sidebar-panel">
-      <div class="sidebar-head">
-        <div>
-          <p class="eyebrow">Sessions</p>
-          <h2>会话记录</h2>
-        </div>
-        <button class="ghost-button" type="button" @click="handleCreateSession">新建</button>
-      </div>
-      <div class="session-list">
-        <button
-          v-for="session in sessions"
-          :key="session.id"
-          class="session-item"
-          :class="{ active: session.id === chatStore.currentSessionId }"
-          type="button"
-          @click="chatStore.selectSession(session.id)"
-        >
-          <strong>{{ session.title }}</strong>
-          <span>{{ session.last_message_preview || '还没有消息' }}</span>
-          <small>{{ session.category }}</small>
-        </button>
-      </div>
-    </aside>
-
+  <section class="workspace-main">
     <div class="chat-panel">
       <header class="panel-head">
         <div>
           <p class="eyebrow">Streaming Chat</p>
           <h2>多源购物对话</h2>
         </div>
-        <button class="primary-button" type="button" @click="router.push('/analysis')">查看分析页</button>
+        <button class="ghost-button" type="button" @click="router.push('/analysis')">查看分析页</button>
       </header>
 
       <section class="plan-strip">
@@ -102,6 +71,12 @@ async function handleCreateSession() {
       </section>
 
       <div class="message-board">
+        <div v-if="showEmptyState" class="empty-chat-state">
+          <p class="eyebrow">Start Here</p>
+          <h3>告诉 ShopMate 你想买什么</h3>
+          <p>先描述品类、预算和使用场景，系统会自动抽取关键词并生成可筛选的分析结果。</p>
+        </div>
+
         <article v-for="message in messages" :key="message.id" class="bubble" :class="message.role">
           <span class="bubble-role">{{ message.role === 'user' ? '你' : 'ShopMate' }}</span>
           <p>{{ message.content }}</p>
