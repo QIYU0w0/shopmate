@@ -14,6 +14,30 @@
   box-sizing: border-box;
 }
 
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.32);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -183,15 +207,49 @@ button {
   align-content: start;
   gap: 6px;
   padding-right: 4px;
+  scrollbar-width: none;
+}
+
+.sidebar-sessionlist > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sidebar-sessionlist::-webkit-scrollbar {
+  width: 0;
+}
+
+.sidebar-sessionlist:hover {
+  scrollbar-width: thin;
+}
+
+.sidebar-sessionlist:hover::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-sessionrow {
+  position: relative;
+  width: 100%;
+  min-height: 42px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sidebar-sessionitem,
+.sidebar-renameform {
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  min-height: 42px;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 12px;
+  transition: background-color 140ms ease, color 140ms ease;
 }
 
 .sidebar-sessionitem {
-  width: 100%;
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 0 10px;
+  position: relative;
+  padding: 0 42px 0 10px;
   border: 0;
   border-radius: 12px;
   background: transparent;
@@ -201,30 +259,123 @@ button {
   transition: background-color 140ms ease, color 140ms ease;
 }
 
-.sidebar-sessionitem:hover {
+.sidebar-sessionrow.active .sidebar-sessionitem,
+.sidebar-sessionrow.active .sidebar-renameform {
+  background: rgba(15, 23, 42, 0.08);
+  color: #111827;
+}
+
+.sidebar-sessionrow:hover .sidebar-sessionitem,
+.sidebar-sessionrow:hover .sidebar-renameform,
+.sidebar-sessionrow:focus-within .sidebar-sessionitem,
+.sidebar-sessionrow:focus-within .sidebar-renameform {
   background: rgba(15, 23, 42, 0.05);
 }
 
-.sidebar-sessionitem.active {
+.sidebar-sessionrow.active:hover .sidebar-sessionitem,
+.sidebar-sessionrow.active:hover .sidebar-renameform,
+.sidebar-sessionrow.active:focus-within .sidebar-sessionitem,
+.sidebar-sessionrow.active:focus-within .sidebar-renameform {
   background: rgba(15, 23, 42, 0.08);
-  color: #111827;
 }
 
 .session-title {
   display: block;
   min-width: 0;
   width: 100%;
+  max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   font-weight: 600;
   text-align: left;
+  line-height: 42px;
 }
 
 .sidebar-empty {
   padding: 8px 10px;
   color: #94a3b8;
   font-size: 0.88rem;
+}
+
+.sidebar-renameform {
+  padding: 0 42px 0 8px;
+  background: transparent;
+}
+
+.sidebar-renameinput {
+  width: 100%;
+  height: 42px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+}
+
+.sidebar-menu-trigger {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
+  color: #475569;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4;
+  transition: opacity 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.sidebar-sessionrow:hover .sidebar-menu-trigger,
+.sidebar-sessionrow.menu-open .sidebar-menu-trigger,
+.sidebar-sessionrow:focus-within .sidebar-menu-trigger {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar-menu-trigger:hover {
+  background: rgba(15, 23, 42, 0.12);
+  color: #111827;
+}
+
+.sidebar-sessionmenu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 200;
+  min-width: 96px;
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+  transform: translateY(-50%);
+}
+
+.sidebar-sessionmenu button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+  background: transparent;
+  color: #1f2937;
+}
+
+.sidebar-sessionmenu button:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.sidebar-sessionmenu button.danger {
+  color: #b42318;
 }
 
 .sidebar-account {
@@ -285,6 +436,7 @@ button {
 }
 
 .workspace-main {
+  height: calc(100vh - 32px);
   min-height: calc(100vh - 32px);
 }
 
@@ -517,11 +669,12 @@ button {
 .chat-panel {
   display: grid;
   gap: 14px;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: calc(100vh - 32px);
   min-height: calc(100vh - 32px);
+  overflow: hidden;
 }
 
-.plan-strip,
 .result-preview,
 .composer-panel {
   padding: 14px 16px;
@@ -530,21 +683,10 @@ button {
   border: 1px solid rgba(148, 163, 184, 0.14);
 }
 
-.plan-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.plan-strip div {
-  display: grid;
-  gap: 6px;
-}
-
 .message-board {
   min-height: 0;
   overflow-y: auto;
-  padding: 4px;
+  padding: 4px 8px 8px 4px;
   align-content: start;
 }
 
@@ -621,6 +763,35 @@ button {
   min-height: 92px;
   max-height: 220px;
   resize: vertical;
+}
+
+.panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  min-height: 56px;
+  padding: 6px 0 10px;
+  background:
+    linear-gradient(180deg, rgba(245, 247, 251, 0.98) 0%, rgba(245, 247, 251, 0.92) 70%, rgba(245, 247, 251, 0) 100%);
+  backdrop-filter: blur(8px);
+}
+
+.chat-panel-title {
+  max-width: min(64ch, calc(100% - 140px));
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
+}
+
+.composer-panel {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.94) 0%, rgba(248, 250, 252, 0.98) 100%);
+  box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.03);
 }
 
 .pill,
@@ -816,6 +987,7 @@ button {
 
   .chat-panel,
   .workspace-main {
+    height: calc(100vh - 32px);
     min-height: calc(100vh - 32px);
   }
 
@@ -825,8 +997,7 @@ button {
     position: static;
   }
 
-  .analysis-summary,
-  .plan-strip {
+  .analysis-summary {
     grid-template-columns: 1fr;
   }
 }
@@ -855,6 +1026,7 @@ button {
   .page-wrap--with-sidebar,
   .workspace-main,
   .chat-panel {
+    height: auto;
     min-height: auto;
   }
 

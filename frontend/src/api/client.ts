@@ -90,6 +90,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     const body = await response.text()
     throw new Error(body || 'Request failed')
   }
+  if (response.status === 204) {
+    return undefined as T
+  }
   return response.json() as Promise<T>
 }
 
@@ -105,6 +108,10 @@ export const chatApi = {
   listSessions: (token: string) => request<SessionSummary[]>('/chat/sessions', { token }),
   createSession: (token: string, title?: string) =>
     request<SessionSummary>('/chat/sessions', { method: 'POST', token, body: JSON.stringify({ title }) }),
+  renameSession: (token: string, sessionId: string, title: string) =>
+    request<SessionSummary>(`/chat/sessions/${sessionId}`, { method: 'PATCH', token, body: JSON.stringify({ title }) }),
+  deleteSession: (token: string, sessionId: string) =>
+    request<void>(`/chat/sessions/${sessionId}`, { method: 'DELETE', token }),
   listMessages: (token: string, sessionId: string) =>
     request<ChatMessage[]>(`/chat/sessions/${sessionId}/messages`, { token }),
   listProducts: (token: string, sessionId: string) =>

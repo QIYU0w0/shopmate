@@ -17,6 +17,21 @@ def _row_to_message(row: sqlite3.Row) -> ChatMessageOut:
     return ChatMessageOut(id=row["id"], role=row["role"], content=row["content"], created_at=row["created_at"])
 
 
+def _session_summary_from_row(connection: sqlite3.Connection, row: sqlite3.Row) -> dict:
+    message_row = connection.execute(
+        "SELECT content FROM chat_messages WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
+        (row["id"],),
+    ).fetchone()
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "category": row["category"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "last_message_preview": (message_row["content"][:42] if message_row else ""),
+    }
+
+
 def _load_product_sources(connection: sqlite3.Connection, product_id: str) -> list[dict]:
     rows = connection.execute(
         "SELECT source_name, provider, source_url, notes FROM product_sources WHERE product_id = ?",
@@ -56,6 +71,24 @@ def _product_from_row(connection: sqlite3.Connection, row: sqlite3.Row) -> Produ
 
 
 def create_session(connection: sqlite3.Connection, user_id: int, title: Optional[str] = None) -> dict:
+    if not title:
+        reusable_session = connection.execute(
+            """
+            SELECT s.id
+            FROM chat_sessions s
+            LEFT JOIN chat_messages m ON m.session_id = s.id
+            LEFT JOIN products p ON p.session_id = s.id
+            WHERE s.user_id = ?
+            GROUP BY s.id
+            HAVING COUNT(m.id) = 0 AND COUNT(p.id) = 0
+            ORDER BY s.updated_at DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+        if reusable_session:
+            return get_session_summary(connection, user_id, reusable_session["id"])
+
     now = utc_now_iso()
     session_id = str(uuid.uuid4())
     final_title = title.strip() if title else "新的购物会话"
@@ -67,7 +100,7 @@ def create_session(connection: sqlite3.Connection, user_id: int, title: Optional
         (session_id, user_id, final_title, "general", now, now),
     )
     connection.commit()
-    return get_session(connection, user_id, session_id)
+    return get_session_summary(connection, user_id, session_id)
 
 
 def get_session(connection: sqlite3.Connection, user_id: int, session_id: str) -> dict:
@@ -80,6 +113,16 @@ def get_session(connection: sqlite3.Connection, user_id: int, session_id: str) -
     return dict(row)
 
 
+def get_session_summary(connection: sqlite3.Connection, user_id: int, session_id: str) -> dict:
+    row = connection.execute(
+        "SELECT id, title, category, created_at, updated_at FROM chat_sessions WHERE id = ? AND user_id = ?",
+        (session_id, user_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="会话不存在。")
+    return _session_summary_from_row(connection, row)
+
+
 def list_sessions(connection: sqlite3.Connection, user_id: int) -> list[dict]:
     session_rows = connection.execute(
         """
@@ -90,23 +133,7 @@ def list_sessions(connection: sqlite3.Connection, user_id: int) -> list[dict]:
         """,
         (user_id,),
     ).fetchall()
-    sessions = []
-    for row in session_rows:
-        message_row = connection.execute(
-            "SELECT content FROM chat_messages WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
-            (row["id"],),
-        ).fetchone()
-        sessions.append(
-            {
-                "id": row["id"],
-                "title": row["title"],
-                "category": row["category"],
-                "created_at": row["created_at"],
-                "updated_at": row["updated_at"],
-                "last_message_preview": (message_row["content"][:42] if message_row else ""),
-            }
-        )
-    return sessions
+    return [_session_summary_from_row(connection, row) for row in session_rows]
 
 
 def list_messages(connection: sqlite3.Connection, user_id: int, session_id: str) -> list[ChatMessageOut]:
@@ -128,6 +155,33 @@ def add_message(connection: sqlite3.Connection, session_id: str, role: str, cont
     connection.execute("UPDATE chat_sessions SET updated_at = ? WHERE id = ?", (now, session_id))
     connection.commit()
     return {"id": message_id, "role": role, "content": content, "created_at": now}
+
+
+def delete_session(connection: sqlite3.Connection, user_id: int, session_id: str) -> None:
+    get_session(connection, user_id, session_id)
+    product_rows = connection.execute(
+        "SELECT id FROM products WHERE session_id = ?",
+        (session_id,),
+    ).fetchall()
+
+    for row in product_rows:
+        connection.execute("DELETE FROM product_sources WHERE product_id = ?", (row["id"],))
+        connection.execute("DELETE FROM product_facets WHERE product_id = ?", (row["id"],))
+
+    connection.execute("DELETE FROM products WHERE session_id = ?", (session_id,))
+    connection.execute("DELETE FROM search_tasks WHERE session_id = ?", (session_id,))
+    connection.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
+    connection.execute("DELETE FROM chat_sessions WHERE id = ? AND user_id = ?", (session_id, user_id))
+    connection.commit()
+
+
+def rename_session(connection: sqlite3.Connection, user_id: int, session_id: str, title: str) -> dict:
+    session = get_session(connection, user_id, session_id)
+    final_title = title.strip()
+    if not final_title:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="会话标题不能为空。")
+    touch_session(connection, session_id, title=final_title, category=session["category"])
+    return get_session_summary(connection, user_id, session_id)
 
 
 def touch_session(

@@ -25,6 +25,10 @@ class SessionCreateRequest(BaseModel):
     title: Optional[str] = None
 
 
+class SessionRenameRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+
+
 class SessionSummary(BaseModel):
     id: str
     title: str

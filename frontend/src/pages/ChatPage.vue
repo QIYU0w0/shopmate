@@ -15,6 +15,11 @@ const quickPrompts = [
   '适合学生党的平板，主要看网课和追剧'
 ]
 
+const currentSessionTitle = computed(() => {
+  const current = chatStore.sessions.find((session) => session.id === chatStore.currentSessionId)
+  return current?.title || '新的购物会话'
+})
+
 const messages = computed(() => chatStore.currentMessages)
 const products = computed(() => chatStore.currentProducts)
 const showEmptyState = computed(
@@ -48,27 +53,9 @@ async function handleSend(message?: string) {
   <section class="workspace-main">
     <div class="chat-panel">
       <header class="panel-head">
-        <div>
-          <p class="eyebrow">Streaming Chat</p>
-          <h2>多源购物对话</h2>
-        </div>
+        <h2 class="chat-panel-title">{{ currentSessionTitle }}</h2>
         <button class="ghost-button" type="button" @click="router.push('/analysis')">查看分析页</button>
       </header>
-
-      <section class="plan-strip">
-        <div>
-          <strong>状态</strong>
-          <span>{{ chatStore.streamPhase }}</span>
-        </div>
-        <div>
-          <strong>分类</strong>
-          <span>{{ chatStore.streamPlan?.category || '待识别' }}</span>
-        </div>
-        <div>
-          <strong>关键词</strong>
-          <span>{{ chatStore.streamPlan?.keywords?.join(' / ') || '待抽取' }}</span>
-        </div>
-      </section>
 
       <div class="message-board">
         <div v-if="showEmptyState" class="empty-chat-state">

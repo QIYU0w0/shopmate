@@ -4,23 +4,33 @@ import asyncio
 import json
 import sqlite3
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from fastapi.responses import StreamingResponse
 
 from ..database import get_connection
 from ..dependencies import get_current_user, get_db
-from ..schemas import ChatMessageOut, ChatSendRequest, ProductOut, SessionCreateRequest, SessionFacetResponse, SessionSummary
+from ..schemas import (
+    ChatMessageOut,
+    ChatSendRequest,
+    ProductOut,
+    SessionCreateRequest,
+    SessionFacetResponse,
+    SessionRenameRequest,
+    SessionSummary,
+)
 from ..services.llm import build_query_plan, chunk_text
 from ..services.search import search_products
 from ..services.session import (
     add_message,
     create_search_task,
     create_session,
+    delete_session,
     get_facets,
     get_session,
     list_messages,
     list_products,
     list_sessions,
+    rename_session,
     replace_products,
     touch_session,
     update_search_task_status,
@@ -46,6 +56,26 @@ def create_chat_session(
     user: dict = Depends(get_current_user),
 ) -> dict:
     return create_session(connection, user["id"], payload.title)
+
+
+@router.patch("/sessions/{session_id}", response_model=SessionSummary)
+def patch_chat_session(
+    session_id: str,
+    payload: SessionRenameRequest,
+    connection: sqlite3.Connection = Depends(get_db),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return rename_session(connection, user["id"], session_id, payload.title)
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_chat_session(
+    session_id: str,
+    connection: sqlite3.Connection = Depends(get_db),
+    user: dict = Depends(get_current_user),
+) -> Response:
+    delete_session(connection, user["id"], session_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/sessions/{session_id}/messages", response_model=list[ChatMessageOut])
